@@ -25,4 +25,4 @@ if not filein.is_file():
 
 args = P.args.strip("\"'").split() if P.args else []
 
-subprocess.check_call([str(exe)] + args, stdin=filein.open(), universal_newlines=True)
+subprocess.check_call([str(exe)] + args, stdin=filein.open(), text=True)
