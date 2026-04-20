@@ -177,3 +177,62 @@ def test_touchdown_verdict_thresholds_match_basic() -> None:
     # Test fatal crash threshold
     assert lunar.touchdown_verdict(60.01) == "SORRY THERE WERE NO SURVIVORS. YOU BLOW IT!"
     assert lunar.touchdown_verdict(100.0) == "SORRY THERE WERE NO SURVIVORS. YOU BLOW IT!"
+
+
+def test_cli_prompt_cadence_and_telemetry_for_committed_scripts() -> None:
+    """
+    Slice 3 AC-3: Verify CLI produces expected prompt structure and telemetry columns.
+
+    The CLI should:
+    - Print the header banner and instructions
+    - Print column headers: SEC, MI + FT, MPH, LB FUEL, BURN RATE
+    - Print telemetry rows at 10-second intervals
+    - Accept burn rate inputs from stdin
+    - Print terminal verdict with ON MOON message
+    - Print flavor text for craft damage (PARTY ARRIVES) or fatal crash (CRATER depth)
+    """
+    import subprocess
+    from pathlib import Path
+
+    # Test with each committed burn script
+    for script_path in [FAIL_SCRIPT, OK_SCRIPT, GOOD_SCRIPT]:
+        result = subprocess.run(
+            ["python3", str(REPO_ROOT / "lunar.py")],
+            stdin=script_path.open("r"),
+            capture_output=True,
+            text=True,
+        )
+
+        assert result.returncode == 0, f"CLI exited non-zero for {script_path.name}: {result.returncode}"
+
+        output = result.stdout
+
+        # Verify banner and instructions present
+        assert "LUNAR" in output
+        assert "CREATIVE COMPUTING" in output
+        assert "APOLLO LUNAR" in output
+        assert "CAPSULE WEIGHT 32,500 LBS; FUEL WEIGHT 16,500 LBS" in output
+
+        # Verify column headers
+        assert "SEC" in output and "MI + FT" in output and "MPH" in output
+        assert "LB FUEL" in output and "BURN RATE" in output
+
+        # Verify terminal state message present
+        assert "ON MOON AT" in output
+        assert "IMPACT VELOCITY" in output
+        assert "MPH" in output
+
+        # Verify at least one verdict is present
+        verdicts = [
+            "PERFECT LANDING!",
+            "GOOD LANDING (COULD BE BETTER)",
+            "CRAFT DAMAGE... YOU'RE STRANDED HERE UNTIL A RESCUE",
+            "SORRY THERE WERE NO SURVIVORS. YOU BLOW IT!",
+        ]
+        assert any(v in output for v in verdicts), f"No verdict found in output for {script_path.name}"
+
+        # Verify flavor text is present for applicable verdicts
+        if "CRAFT DAMAGE" in output:
+            assert "PARTY ARRIVES. HOPE YOU HAVE ENOUGH OXYGEN!" in output
+        if "SORRY THERE WERE NO SURVIVORS" in output:
+            assert "CRATER" in output and "FEET DEEP" in output

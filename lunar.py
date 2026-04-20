@@ -123,8 +123,8 @@ def main():
     l = 0  # elapsed time in seconds
     a = 120  # altitude in miles
     v = 1  # velocity in miles/sec (downward)
-    m = 33000  # total mass in lbs
-    n = 16500  # fuel mass in lbs
+    m = 33000  # total mass in lbs (capsule + fuel)
+    n = 16500  # capsule dry mass in lbs (constant)
 
     print()
     print()
@@ -136,7 +136,7 @@ def main():
         altitude_miles = int(a)
         altitude_feet = int(5280 * (a - int(a)))
         mph = 3600 * v
-        fuel_remaining = m - n
+        fuel_remaining = m - n  # m=total mass, n=dry mass, so m-n=fuel remaining
 
         print(f"{l}\t\t{altitude_miles} + {altitude_feet}\t\t{mph:.1f}\t\t{fuel_remaining:.1f}", end="\t\t")
 
@@ -156,7 +156,13 @@ def main():
             l = l + s
             w = 3600 * v
             print(f"ON MOON AT {l:.1f} SECONDS - IMPACT VELOCITY {w:.2f} MPH")
-            print(touchdown_verdict(w))
+            verdict = touchdown_verdict(w)
+            print(verdict)
+            # Print follow-up flavor text (lines 286, 310)
+            if 10 < w <= 60:
+                print("PARTY ARRIVES. HOPE YOU HAVE ENOUGH OXYGEN!")
+            elif w > 60:
+                print(f"IN FACT, YOU BLASTED A NEW LUNAR CRATER {w * 0.227:.1f} FEET DEEP!")
             break
 
         # Simulate time step (lines 170-230)
@@ -164,25 +170,36 @@ def main():
             a, v, m, fuel_mass, s = simulation_step(a, v, m, m - n, k, t)
             l = l + s
             t = t - s
-            n = 33000 - m  # Recalculate fuel consumed
+            # Note: n (dry mass) never changes; fuel remaining = m - n
 
             # Check for landing (line 200-220)
             if a <= 0:
                 w = 3600 * v
                 print(f"ON MOON AT {l:.1f} SECONDS - IMPACT VELOCITY {w:.2f} MPH")
-                print(touchdown_verdict(w))
+                verdict = touchdown_verdict(w)
+                print(verdict)
+                # Print follow-up flavor text (lines 286, 310)
+                if 10 < w <= 60:
+                    print("PARTY ARRIVES. HOPE YOU HAVE ENOUGH OXYGEN!")
+                elif w > 60:
+                    print(f"IN FACT, YOU BLASTED A NEW LUNAR CRATER {w * 0.227:.1f} FEET DEEP!")
                 sys.exit(0)
 
             # Check for fuel out mid-step
-            if m - (33000 - m) < 1e-3:
+            if m - n < 1e-3:
                 print(f"FUEL OUT AT {l} SECONDS")
-                remaining_fuel_mass = m - (33000 - m)
                 s = (-v + math.sqrt(v * v + 2 * a * G)) / G
                 v = v + G * s
                 l = l + s
                 w = 3600 * v
                 print(f"ON MOON AT {l:.1f} SECONDS - IMPACT VELOCITY {w:.2f} MPH")
-                print(touchdown_verdict(w))
+                verdict = touchdown_verdict(w)
+                print(verdict)
+                # Print follow-up flavor text (lines 286, 310)
+                if 10 < w <= 60:
+                    print("PARTY ARRIVES. HOPE YOU HAVE ENOUGH OXYGEN!")
+                elif w > 60:
+                    print(f"IN FACT, YOU BLASTED A NEW LUNAR CRATER {w * 0.227:.1f} FEET DEEP!")
                 sys.exit(0)
 
 
