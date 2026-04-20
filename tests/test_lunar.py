@@ -1,9 +1,14 @@
 from pathlib import Path
+import sys
 
 import pytest
 
-
+# Add parent directory to path to import lunar module
 REPO_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO_ROOT))
+
+import lunar
+
 BASIC_SOURCE = REPO_ROOT / "lunar.bas"
 
 FAIL_SCRIPT = REPO_ROOT / "test/fail.asc"
@@ -69,3 +74,106 @@ def test_oracle_fixture_expectations_for_fail_ok_good_scripts(script_name: str, 
     assert expected_terminal_verdicts["test/ok.asc"] == "CRAFT DAMAGE... YOU'RE STRANDED HERE UNTIL A RESCUE"
     assert expected_terminal_verdicts["test/good.asc"] == "GOOD LANDING (COULD BE BETTER)"
     assert expected_terminal_verdicts[script_name] == expected_verdict
+
+
+def test_python_step_matches_basic_series_expansion() -> None:
+    """
+    AC-1: Verify simulation_step implements the polynomial series from lunar.bas lines 420-430.
+
+    The BASIC oracle computes:
+      Q = S*K/M
+      J = V + G*S + Z*(-Q - Q*Q/2 - Q^3/3 - Q^4/4 - Q^5/5)
+      I = A - G*S*S/2 - V*S + Z*S*(Q/2 + Q^2/6 + Q^3/12 + Q^4/20 + Q^5/30)
+
+    This test confirms the Python port produces identical results for known state.
+    """
+    # Known state: altitude=120mi, velocity=1mi/s, mass=33000lb, fuel=16500lb, burn=150lb/s, dt=10s
+    altitude = 120.0
+    velocity = 1.0
+    mass = 33000.0
+    fuel_mass = 16500.0
+    burn_rate = 150.0
+    time_step = 10.0
+
+    # Hand-calculate BASIC oracle values
+    s = time_step
+    k = burn_rate
+    m = mass
+    v = velocity
+    a = altitude
+    g = lunar.G
+    z = lunar.Z
+
+    q = s * k / m
+    j_expected = v + g * s + z * (-q - q * q / 2 - q**3 / 3 - q**4 / 4 - q**5 / 5)
+    i_expected = a - g * s * s / 2 - v * s + z * s * (q / 2 + q**2 / 6 + q**3 / 12 + q**4 / 20 + q**5 / 30)
+
+    # Call Python implementation
+    new_altitude, new_velocity, new_mass, new_fuel_mass, actual_step = lunar.simulation_step(
+        altitude, velocity, mass, fuel_mass, burn_rate, time_step
+    )
+
+    # Verify polynomial terms match BASIC
+    assert abs(new_velocity - j_expected) < 1e-9, f"Velocity mismatch: {new_velocity} vs {j_expected}"
+    assert abs(new_altitude - i_expected) < 1e-9, f"Altitude mismatch: {new_altitude} vs {i_expected}"
+    assert abs(new_mass - (mass - s * k)) < 1e-9, "Mass update mismatch"
+    assert abs(new_fuel_mass - (fuel_mass - s * k)) < 1e-9, "Fuel mass update mismatch"
+    assert abs(actual_step - s) < 1e-9, "Time step mismatch"
+
+
+def test_fuel_out_terminal_velocity_matches_basic_formula() -> None:
+    """
+    AC-2: Verify fuel_out_terminal_velocity implements lunar.bas lines 240-250.
+
+    The BASIC oracle computes:
+      S = (-V + SQR(V*V + 2*A*G)) / G
+      V_terminal = V + G*S
+      W = 3600 * V_terminal (convert to mph)
+
+    This test confirms the Python quadratic-formula solver matches BASIC.
+    """
+    # Known fuel-out state from test/fail.asc trajectory endpoint
+    altitude = 0.5  # miles
+    velocity = 0.05  # miles/sec downward
+
+    # Hand-calculate BASIC oracle terminal velocity
+    g = lunar.G
+    import math
+    s = (-velocity + math.sqrt(velocity * velocity + 2 * altitude * g)) / g
+    v_terminal_basic = velocity + g * s
+    w_basic = 3600 * v_terminal_basic
+
+    # Call Python implementation
+    w_python = lunar.fuel_out_terminal_velocity(altitude, velocity)
+
+    # Verify quadratic formula match
+    assert abs(w_python - w_basic) < 1e-6, f"Terminal velocity mismatch: {w_python} vs {w_basic}"
+
+
+def test_touchdown_verdict_thresholds_match_basic() -> None:
+    """
+    AC-3: Verify touchdown_verdict implements lunar.bas lines 274-300 verdict branches.
+
+    The BASIC oracle has these thresholds:
+      W <= 1.2: PERFECT LANDING!
+      W <= 10: GOOD LANDING (COULD BE BETTER)
+      10 < W <= 60: CRAFT DAMAGE... YOU'RE STRANDED HERE UNTIL A RESCUE
+      W > 60: SORRY THERE WERE NO SURVIVORS. YOU BLOW IT!
+
+    This test confirms the Python verdict logic matches BASIC branch conditions.
+    """
+    # Test perfect landing threshold
+    assert lunar.touchdown_verdict(1.2) == "PERFECT LANDING!"
+    assert lunar.touchdown_verdict(1.0) == "PERFECT LANDING!"
+
+    # Test good landing threshold
+    assert lunar.touchdown_verdict(1.21) == "GOOD LANDING (COULD BE BETTER)"
+    assert lunar.touchdown_verdict(10.0) == "GOOD LANDING (COULD BE BETTER)"
+
+    # Test craft damage threshold
+    assert lunar.touchdown_verdict(10.01) == "CRAFT DAMAGE... YOU'RE STRANDED HERE UNTIL A RESCUE"
+    assert lunar.touchdown_verdict(60.0) == "CRAFT DAMAGE... YOU'RE STRANDED HERE UNTIL A RESCUE"
+
+    # Test fatal crash threshold
+    assert lunar.touchdown_verdict(60.01) == "SORRY THERE WERE NO SURVIVORS. YOU BLOW IT!"
+    assert lunar.touchdown_verdict(100.0) == "SORRY THERE WERE NO SURVIVORS. YOU BLOW IT!"
