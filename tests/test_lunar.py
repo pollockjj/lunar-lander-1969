@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 BASIC_SOURCE = REPO_ROOT / "lunar.bas"
@@ -36,7 +38,15 @@ def test_series_equation_terms_match_basic_update_block() -> None:
     assert "I=A-G*S*S/2-V*S+Z*S*(Q/2+Q^2/6+Q^3/12+Q^4/20+Q^5/30)" in source
 
 
-def test_oracle_fixture_expectations_for_fail_ok_good_scripts() -> None:
+@pytest.mark.parametrize(
+    ("script_name", "expected_verdict"),
+    [
+        ("test/fail.asc", FAIL_VERDICT),
+        ("test/ok.asc", OK_VERDICT),
+        ("test/good.asc", GOOD_VERDICT),
+    ],
+)
+def test_oracle_fixture_expectations_for_fail_ok_good_scripts(script_name: str, expected_verdict: str) -> None:
     fail_burns = _read_burn_script(FAIL_SCRIPT)
     ok_burns = _read_burn_script(OK_SCRIPT)
     good_burns = _read_burn_script(GOOD_SCRIPT)
@@ -54,11 +64,8 @@ def test_oracle_fixture_expectations_for_fail_ok_good_scripts() -> None:
     assert min(good_burns) == 0
 
     # Oracle verdict expectations tied to script fixtures.
-    expected_terminal_verdicts = {
-        "test/fail.asc": FAIL_VERDICT,
-        "test/ok.asc": OK_VERDICT,
-        "test/good.asc": GOOD_VERDICT,
-    }
+    expected_terminal_verdicts = {"test/fail.asc": FAIL_VERDICT, "test/ok.asc": OK_VERDICT, "test/good.asc": GOOD_VERDICT}
     assert expected_terminal_verdicts["test/fail.asc"] == "SORRY THERE WERE NO SURVIVORS. YOU BLOW IT!"
     assert expected_terminal_verdicts["test/ok.asc"] == "CRAFT DAMAGE... YOU'RE STRANDED HERE UNTIL A RESCUE"
     assert expected_terminal_verdicts["test/good.asc"] == "GOOD LANDING (COULD BE BETTER)"
+    assert expected_terminal_verdicts[script_name] == expected_verdict
