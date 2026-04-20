@@ -82,7 +82,7 @@ def touchdown_verdict(impact_velocity_mph):
     Returns:
         verdict string
     """
-    w = impact_velocity_mph
+    w = abs(impact_velocity_mph)
 
     if w <= 1.2:
         return "PERFECT LANDING!"
@@ -170,7 +170,6 @@ def main():
             a, v, m, fuel_mass, s = simulation_step(a, v, m, m - n, k, t)
             l = l + s
             t = t - s
-            # Note: n (dry mass) never changes; fuel remaining = m - n
 
             # Check for landing (line 200-220)
             if a <= 0:
@@ -178,7 +177,6 @@ def main():
                 print(f"ON MOON AT {l:.1f} SECONDS - IMPACT VELOCITY {w:.2f} MPH")
                 verdict = touchdown_verdict(w)
                 print(verdict)
-                # Print follow-up flavor text (lines 286, 310)
                 if 10 < w <= 60:
                     print("PARTY ARRIVES. HOPE YOU HAVE ENOUGH OXYGEN!")
                 elif w > 60:
@@ -195,7 +193,6 @@ def main():
                 print(f"ON MOON AT {l:.1f} SECONDS - IMPACT VELOCITY {w:.2f} MPH")
                 verdict = touchdown_verdict(w)
                 print(verdict)
-                # Print follow-up flavor text (lines 286, 310)
                 if 10 < w <= 60:
                     print("PARTY ARRIVES. HOPE YOU HAVE ENOUGH OXYGEN!")
                 elif w > 60:
