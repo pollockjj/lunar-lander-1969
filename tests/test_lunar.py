@@ -196,12 +196,13 @@ def test_cli_prompt_cadence_and_telemetry_for_committed_scripts() -> None:
 
     # Test with each committed burn script
     for script_path in [FAIL_SCRIPT, OK_SCRIPT, GOOD_SCRIPT]:
-        result = subprocess.run(
-            ["python3", str(REPO_ROOT / "lunar.py")],
-            stdin=script_path.open("r"),
-            capture_output=True,
-            text=True,
-        )
+        with script_path.open("r") as script_input:
+            result = subprocess.run(
+                ["python3", str(REPO_ROOT / "lunar.py")],
+                stdin=script_input,
+                capture_output=True,
+                text=True,
+            )
 
         assert result.returncode == 0, f"CLI exited non-zero for {script_path.name}: {result.returncode}"
 

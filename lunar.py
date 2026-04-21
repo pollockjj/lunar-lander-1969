@@ -29,7 +29,7 @@ def simulation_step(altitude, velocity, mass, fuel_mass, burn_rate, time_step):
     m = mass
 
     # Clamp burn to available fuel (line 180-190 logic)
-    if m >= fuel_mass + s * k:
+    if fuel_mass >= s * k:
         # Enough fuel for full burn
         pass
     else:
