@@ -1,0 +1,4 @@
+ERROR: file or directory not found: tests/test_lunar.py::test_oracle_fail_script_checkpoints
+
+
+no tests ran in 0.00s

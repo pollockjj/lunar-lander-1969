@@ -1,0 +1,4 @@
+ERROR: file or directory not found: tests/test_lunar.py::test_oracle_good_and_ok_script_verdicts
+
+
+no tests ran in 0.00s
