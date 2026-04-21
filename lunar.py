@@ -167,13 +167,41 @@ def main():
 
         # Simulate time step (lines 170-230)
         while t >= 1e-3:
-            a, v, m, fuel_mass, s = simulation_step(a, v, m, m - n, k, t)
-            l = l + s
-            t = t - s
+            # Line 200: GOSUB 420 (compute new state) and check IF I<=0 THEN 340
+            new_altitude, new_velocity, new_mass, new_fuel_mass, s = simulation_step(a, v, m, m - n, k, t)
 
-            # Check for landing (line 200-220)
-            if a <= 0:
-                w = 3600 * v
+            # Check for landing BEFORE committing the step (line 200: IF I<=0 THEN 340)
+            if new_altitude <= 0:
+                # Touchdown refinement loop (lines 340-360)
+                # Iteratively refine the final step to compute exact impact velocity
+                # Start with current state (a, v, m) before the step that went below zero
+                refine_s = s
+                refine_a = a
+                refine_v = v
+                refine_m = m
+
+                print(f"DEBUG: Entering refinement. Initial a={refine_a:.6f}, v={refine_v:.6f}, s={refine_s:.6f}", file=sys.stderr)
+
+                iter_count = 0
+                while refine_s >= 5e-3:
+                    # Line 350: compute refined step
+                    accel_term = G - Z * k / refine_m
+                    discriminant = refine_v * refine_v + 2 * refine_a * accel_term
+                    print(f"DEBUG: iter={iter_count}, a={refine_a:.6f}, v={refine_v:.6f}, s={refine_s:.6f}, disc={discriminant:.6f}", file=sys.stderr)
+
+                    d = refine_v + math.sqrt(discriminant)
+                    refine_s = 2 * refine_a / d
+                    # Line 360: GOSUB 420 (recalculate), GOSUB 330 (update state)
+                    refine_a, refine_v, refine_m, _, _ = simulation_step(refine_a, refine_v, refine_m, refine_m - n, k, refine_s)
+                    l = l + refine_s
+                    iter_count += 1
+                    if iter_count > 100:
+                        print("DEBUG: refinement not converging, breaking", file=sys.stderr)
+                        break
+
+                # Line 340: s < 5e-3, proceed to verdict (line 260)
+                print(f"DEBUG: Exiting refinement after {iter_count} iters. Final a={refine_a:.6f}, v={refine_v:.6f}", file=sys.stderr)
+                w = 3600 * refine_v
                 print(f"ON MOON AT {l:.1f} SECONDS - IMPACT VELOCITY {w:.2f} MPH")
                 verdict = touchdown_verdict(w)
                 print(verdict)
@@ -182,6 +210,13 @@ def main():
                 elif w > 60:
                     print(f"IN FACT, YOU BLASTED A NEW LUNAR CRATER {w * 0.227:.1f} FEET DEEP!")
                 sys.exit(0)
+
+            # Line 330: commit the step (L=L+S: T=T-S: M=M-S*K: A=I: V=J)
+            a = new_altitude
+            v = new_velocity
+            m = new_mass
+            l = l + s
+            t = t - s
 
             # Check for fuel out mid-step
             if m - n < 1e-3:

@@ -194,11 +194,18 @@ def test_cli_prompt_cadence_and_telemetry_for_committed_scripts() -> None:
     import subprocess
     from pathlib import Path
 
+    # Map each script to its expected verdict
+    script_expected_verdicts = {
+        FAIL_SCRIPT: FAIL_VERDICT,
+        OK_SCRIPT: OK_VERDICT,
+        GOOD_SCRIPT: GOOD_VERDICT,
+    }
+
     # Test with each committed burn script
-    for script_path in [FAIL_SCRIPT, OK_SCRIPT, GOOD_SCRIPT]:
+    for script_path, expected_verdict in script_expected_verdicts.items():
         with script_path.open("r") as script_input:
             result = subprocess.run(
-                ["python3", str(REPO_ROOT / "lunar.py")],
+                [sys.executable, str(REPO_ROOT / "lunar.py")],
                 stdin=script_input,
                 capture_output=True,
                 text=True,
@@ -223,14 +230,8 @@ def test_cli_prompt_cadence_and_telemetry_for_committed_scripts() -> None:
         assert "IMPACT VELOCITY" in output
         assert "MPH" in output
 
-        # Verify at least one verdict is present
-        verdicts = [
-            "PERFECT LANDING!",
-            "GOOD LANDING (COULD BE BETTER)",
-            "CRAFT DAMAGE... YOU'RE STRANDED HERE UNTIL A RESCUE",
-            "SORRY THERE WERE NO SURVIVORS. YOU BLOW IT!",
-        ]
-        assert any(v in output for v in verdicts), f"No verdict found in output for {script_path.name}"
+        # Verify the script-specific expected verdict is present
+        assert expected_verdict in output, f"Expected verdict '{expected_verdict}' not found in output for {script_path.name}"
 
         # Verify flavor text is present for applicable verdicts
         if "CRAFT DAMAGE" in output:
