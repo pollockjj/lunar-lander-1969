@@ -180,27 +180,17 @@ def main():
                 refine_v = v
                 refine_m = m
 
-                print(f"DEBUG: Entering refinement. Initial a={refine_a:.6f}, v={refine_v:.6f}, s={refine_s:.6f}", file=sys.stderr)
-
-                iter_count = 0
                 while refine_s >= 5e-3:
                     # Line 350: compute refined step
                     accel_term = G - Z * k / refine_m
                     discriminant = refine_v * refine_v + 2 * refine_a * accel_term
-                    print(f"DEBUG: iter={iter_count}, a={refine_a:.6f}, v={refine_v:.6f}, s={refine_s:.6f}, disc={discriminant:.6f}", file=sys.stderr)
-
                     d = refine_v + math.sqrt(discriminant)
                     refine_s = 2 * refine_a / d
                     # Line 360: GOSUB 420 (recalculate), GOSUB 330 (update state)
                     refine_a, refine_v, refine_m, _, _ = simulation_step(refine_a, refine_v, refine_m, refine_m - n, k, refine_s)
                     l = l + refine_s
-                    iter_count += 1
-                    if iter_count > 100:
-                        print("DEBUG: refinement not converging, breaking", file=sys.stderr)
-                        break
 
                 # Line 340: s < 5e-3, proceed to verdict (line 260)
-                print(f"DEBUG: Exiting refinement after {iter_count} iters. Final a={refine_a:.6f}, v={refine_v:.6f}", file=sys.stderr)
                 w = 3600 * refine_v
                 print(f"ON MOON AT {l:.1f} SECONDS - IMPACT VELOCITY {w:.2f} MPH")
                 verdict = touchdown_verdict(w)
@@ -211,7 +201,57 @@ def main():
                     print(f"IN FACT, YOU BLASTED A NEW LUNAR CRATER {w * 0.227:.1f} FEET DEEP!")
                 sys.exit(0)
 
-            # Line 330: commit the step (L=L+S: T=T-S: M=M-S*K: A=I: V=J)
+            # Line 210: IF V<=0 THEN 230 (if old velocity non-positive, skip J<0 check)
+            if v <= 0:
+                # Line 230: GOSUB 330: GOTO 160 (commit step, continue)
+                a = new_altitude
+                v = new_velocity
+                m = new_mass
+                l = l + s
+                t = t - s
+                continue
+
+            # Line 220: IF J<0 THEN 370 (if new velocity negative, use alternative step sizing)
+            if new_velocity < 0:
+                # Line 370: compute alternative step size
+                w_term = (1 - m * G / (Z * k)) / 2
+                alt_s = m * v / (Z * k * (w_term + math.sqrt(w_term * w_term + v / Z))) + 0.05
+                alt_altitude, alt_velocity, alt_mass, alt_fuel_mass, _ = simulation_step(a, v, m, m - n, k, alt_s)
+
+                # Line 380: IF I<=0 THEN 340
+                if alt_altitude <= 0:
+                    refine_s = alt_s
+                    refine_a = a
+                    refine_v = v
+                    refine_m = m
+
+                    while refine_s >= 5e-3:
+                        accel_term = G - Z * k / refine_m
+                        discriminant = refine_v * refine_v + 2 * refine_a * accel_term
+                        d = refine_v + math.sqrt(discriminant)
+                        refine_s = 2 * refine_a / d
+                        refine_a, refine_v, refine_m, _, _ = simulation_step(refine_a, refine_v, refine_m, refine_m - n, k, refine_s)
+                        l = l + refine_s
+
+                    w = 3600 * refine_v
+                    print(f"ON MOON AT {l:.1f} SECONDS - IMPACT VELOCITY {w:.2f} MPH")
+                    verdict = touchdown_verdict(w)
+                    print(verdict)
+                    if 10 < w <= 60:
+                        print("PARTY ARRIVES. HOPE YOU HAVE ENOUGH OXYGEN!")
+                    elif w > 60:
+                        print(f"IN FACT, YOU BLASTED A NEW LUNAR CRATER {w * 0.227:.1f} FEET DEEP!")
+                    sys.exit(0)
+
+                # Line 390-410: commit step and continue
+                a = alt_altitude
+                v = alt_velocity
+                m = alt_mass
+                l = l + alt_s
+                t = t - alt_s
+                continue
+
+            # Line 230: GOSUB 330: GOTO 160 (commit the step normally)
             a = new_altitude
             v = new_velocity
             m = new_mass

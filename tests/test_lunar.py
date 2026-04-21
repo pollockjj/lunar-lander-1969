@@ -192,7 +192,6 @@ def test_cli_prompt_cadence_and_telemetry_for_committed_scripts() -> None:
     - Print flavor text for craft damage (PARTY ARRIVES) or fatal crash (CRATER depth)
     """
     import subprocess
-    from pathlib import Path
 
     # Map each script to its expected verdict
     script_expected_verdicts = {
